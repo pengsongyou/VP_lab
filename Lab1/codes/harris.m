@@ -1,9 +1,4 @@
-close all;
-clear;
-clc;
-
-im = imread('./images/chessboard04.png'); 
-
+function subp = harris(im, gaussian_size)
 im_orig = im;
 if size(im,3)>1 
     im=rgb2gray(im); 
@@ -17,22 +12,18 @@ end
 Ix = conv2(double(im), dx, 'same'); Iy = conv2(double(im), dy, 'same');
 sigma=2;
 % Generate Gaussian filter of size 9x9 and std. dev. sigma. 
-g = fspecial('gaussian',9, sigma);
+g = fspecial('gaussian',gaussian_size, sigma);
 % Smoothed squared image derivatives 
 Ix2 = conv2(Ix.^2, g, 'same');
 Iy2 = conv2(Iy.^2, g, 'same');
 Ixy = conv2(Ix.*Iy, g, 'same');
 
-%% Part 1 & 2
+%% Compute E and R Matrix
 
-% Compute M matrix
-
-% im = imresize(im,[size(im,1)/3,size(im,2)]);
 [height, width] = size(im);
 E = zeros(height, width);
 R = zeros(height, width);
 k = 0.04;
-tic
 for i = 2 : height - 1
     for j = 2 : width - 1
         Ix2_sum = sum(sum(Ix2(i - 1 : i + 1, j - 1 : j + 1)));
@@ -46,13 +37,11 @@ for i = 2 : height - 1
         E(i,j) = e(1);
     end
 end
-toc
-imshow(mat2gray(E));
 
-%% Part 3 & 4
+%% Non-Maximal Suppression
 
 % structure initialization
-num_max = 81;
+num_max = 81; 
 features(num_max).p_x = 0;
 features(num_max).p_y = 0;
 
@@ -61,10 +50,7 @@ features(num_max).p_y = 0;
 
 i = 0;% for loop of all pixels
 f = 0;% for loop of feature points
-
-
 D = E;
-
 
 while f < num_max
     i = i + 1;
@@ -88,17 +74,9 @@ while f < num_max
                
     end
 end
-
-% plot
-figure; imshow(im_orig); hold on;
-% figure;imshow(mat2gray(E));hold on;
-for i=1:size(features,2),
-plot(features(i).p_y, features(i).p_x, 'r+');
-end
-
-% Part 5
+%% Sub-pixel Accuracy
 i = 0;
-% subp = zeros(num_max,2);
+subp = zeros(81,2);
 while i < num_max
     i = i + 1;
     x = features(i).p_x;
@@ -112,12 +90,15 @@ while i < num_max
         end
     end
     p = A\b; % Least mean square to find all the unknown parameters
-
-subp = [2*p(1) p(2);p(2) 2*p(3)]\[-p(4);-p(5)];
-if abs(subp(1) - x) > 0.5 || abs(subp(2)-y) > 0.5
-%     plot(subp(2), subp(1), 'b+');
-    subp(1) = x;
-    subp(2) = y;
+    if 4*p(1)*p(3) -p(2)*p(2) <= 0
+        subp(i,1) = x;
+        subp(i,2) = y;
+    else
+        subp(i,:) = [2*p(1) p(2);p(2) 2*p(3)]\[-p(4);-p(5)];
+        if abs(subp(1) - x) > 0.5 || abs(subp(2)-y) > 0.5
+            subp(i,1) = x;
+            subp(i,2) = y;
+        end
+    end
 end
-plot(subp(2), subp(1), 'g+');
 end
