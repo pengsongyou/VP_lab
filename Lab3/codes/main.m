@@ -81,34 +81,62 @@ for i = 1 : pn
    v2(:,i) = v2(:,i) ./ v2(3,i);
 end
 
-%% Step 7 Draw the 2D points in windows
-figure; hold on; title('2D points in image plane1');
-for i = 1 : pn 
-    plot(v1(2,i),v1(1,i),'r+', 'MarkerSize',10);    
-end
-xlim([0 width1])
-ylim([0 height1])
-hold off
-
-figure; hold on; title('2D points in image plane2');
-for i = 1 : pn 
-    plot(v2(2,i),v2(1,i),'r+', 'MarkerSize',10);    
-end
-xlim([0 width2])
-ylim([0 height2])
-hold off
+%% Step 7 Draw the 2D points in two camera windows
 
 %% Step8 Compute Fundamental matrix using 8-pionts least mean square method
-U = zeros(pn,8);
-for i = 1 : pn
-    x = v1(1,i);
-    x_ = v2(1,i);
-    y = v1(2,i);
-    y_ = v2(2,i);
-    U(i,:) = [x*x_, x_*y, x_, x*y_, y*y_, y_, x, y];
-end
-F_v = -U\ones(pn,1);
-F = reshape([F_v;1],[3,3])';
+F = compute_F(v1,v2);
+
 %% Step9 Compare the F acquired from Step8 with the Ground truth
 F == F_ground
-%%
+
+%% Step10 Draw epipoles and epipolar lines
+
+% Step 7 is moved here
+% 
+
+epi_plot(v2,v1,F,[0,height2],[0,400]);
+
+% Draw the epipole
+% pole2 = [(d(2) - d(1))/(m(1) - m(2)),m(1) * (d(2) - d(1))/(m(1) - m(2)) + d(1)];
+% plot(pole2(1),pole2(2),'*','MarkerSize',10);
+% text(pole2(1)-20,pole2(2)-10, ' epipole','FontSize',10);
+
+
+epi_plot(v1,v2,F',[0,height1],[-340, width1]);
+
+% % Draw the epipole
+% pole1 = [(d(2) - d(1))/(m(1) - m(2)),m(1) * (d(2) - d(1))/(m(1) - m(2)) + d(1)];
+% plot(pole1(1),pole1(2),'*','MarkerSize',10);
+% text(pole1(1)-20,pole1(2)-10, ' epipole','FontSize',10);
+% 
+% hold off;
+
+%% Step11 Add Gaussian Noise to 2D points
+std_noise = 0.5;% Satisfy the condition that 95% of noise points are within the range of [-1,1]
+
+vn1 = v1;
+vn1 = vn1 + std_noise * randn(3,pn); % Get noisy 2D points
+
+vn2 = v2;
+vn2 = vn2 + std_noise * randn(3,pn); % Get noisy 2D points
+
+
+%% Repeat Step8 up to 10 with the noisy 2D points
+
+% Step8 : Compute fundamental matrix
+F_n = compute_F(vn1,vn2);
+
+epi_plot(vn2,vn1,F_n,[0,height2],[0,400]);
+
+epi_plot(vn1,vn2,F_n',[0,height1],[-340, width1]);
+
+%% Part2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Step14 Fundamental Matrix by SVD, Compare
+F_svd = compute_F_svd(v1,v2);
+
+epi_plot(v2,v1,F_svd,[0,height2],[0,400]); 
+
+F_n_svd = compute_F_svd(vn1,vn2);
+
+epi_plot(vn2,vn1,F_n_svd,[0,height2],[0,400]); 
