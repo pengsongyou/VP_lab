@@ -1,4 +1,4 @@
-function epi_plot(v1,v2,F,lim_h,lim_w)
+function [m,d] = epi_plot(v1,v2,F,lim_h,lim_w)
 % Plot points in image plane
 figure; hold on; %title('2D points in image plane2');
 pn = size(v1,2);

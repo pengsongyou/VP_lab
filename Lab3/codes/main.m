@@ -3,6 +3,7 @@ close all
 clear
 clc
 
+f=80; % focal length. Unit: mm
 %% Step1 Define camera 1
 au1 = 100; av1 = 120; uo1 = 128; vo1 = 128;
 height1 = 256;
@@ -94,15 +95,25 @@ F == F_ground
 % Step 7 is moved here
 % 
 
-epi_plot(v2,v1,F,[0,height2],[0,400]);
+% [m,d] = epi_plot(v2,v1,F,[0,height2],[0,400]);
 
-% Draw the epipole
-% pole2 = [(d(2) - d(1))/(m(1) - m(2)),m(1) * (d(2) - d(1))/(m(1) - m(2)) + d(1)];
-% plot(pole2(1),pole2(2),'*','MarkerSize',10);
-% text(pole2(1)-20,pole2(2)-10, ' epipole','FontSize',10);
+% Draw the epipole (way1, the last column of U and V in SVD(F))
+[u,s,v] = svd(F);
+pr = [u(1,3)/u(3,3),u(2,3)/u(3,3)];
+pl = [v(1,3)/v(3,3),v(2,3)/v(3,3)];
+% Draw the epipole (way2, projecting the focal point of each camera to the
+% image plane of the other)
+% Be careful, we should add intrinsic matrix to change to the pixel instead
+% of metric
+T1 = IN1 * EX1; % world point to frame 1
+T2 = IN2 * EX2; % world point to frame 2
 
+pr_tmp = T2 * [0;0;0;1];
+pl_tmp = T1 * [tx;ty;tz;1];
+pr = [pr_tmp(1)/pr_tmp(3),pr_tmp(2)/pr_tmp(3)];
+pl = [pl_tmp(1)/pl_tmp(3),pl_tmp(2)/pl_tmp(3)];
 
-epi_plot(v1,v2,F',[0,height1],[-340, width1]);
+% epi_plot(v1,v2,F',[0,height1],[-340, width1]);
 
 % % Draw the epipole
 % pole1 = [(d(2) - d(1))/(m(1) - m(2)),m(1) * (d(2) - d(1))/(m(1) - m(2)) + d(1)];
@@ -112,7 +123,7 @@ epi_plot(v1,v2,F',[0,height1],[-340, width1]);
 % hold off;
 
 %% Step11 Add Gaussian Noise to 2D points
-std_noise = 0.5;% Satisfy the condition that 95% of noise points are within the range of [-1,1]
+std_noise = 0.05;% Satisfy the condition that 95% of noise points are within the range of [-1,1]
 
 vn1 = v1;
 vn1 = vn1 + std_noise * randn(3,pn); % Get noisy 2D points
@@ -126,17 +137,77 @@ vn2 = vn2 + std_noise * randn(3,pn); % Get noisy 2D points
 % Step8 : Compute fundamental matrix
 F_n = compute_F(vn1,vn2);
 
-epi_plot(vn2,vn1,F_n,[0,height2],[0,400]);
+% epi_plot(vn2,vn1,F_n,[0,height2],[0,400]);
 
-epi_plot(vn1,vn2,F_n',[0,height1],[-340, width1]);
+% epi_plot(vn1,vn2,F_n',[0,height1],[-340, width1]);
 
 %% Part2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Step14 Fundamental Matrix by SVD, Compare
 F_svd = compute_F_svd(v1,v2);
 
-epi_plot(v2,v1,F_svd,[0,height2],[0,400]); 
+% epi_plot(v2,v1,F_svd,[0,height2],[0,400]); 
 
 F_n_svd = compute_F_svd(vn1,vn2);
 
-epi_plot(vn2,vn1,F_n_svd,[0,height2],[0,400]); 
+% epi_plot(vn2,vn1,F_n_svd,[0,height2],[0,400]); 
+
+%% Plot system
+
+figure;
+
+ps_3D = [V(1,1),V(2,1),V(3,1)];
+% plot a 3D point
+scatter3(ps_3D(1),ps_3D(2),ps_3D(3)); hold on; title('Epipolar system');
+xlabel('x'); ylabel('y'); zlabel('z')
+
+% plot the focal points of both camera
+o_c1 = [0;0;0;1];% origin of camera 1
+x_c1 = [1;0;0;0];% x axis of camera 1
+y_c1 = [0;1;0;0];% y axis of camera 1
+z_c1 = [0;0;1;0];% z axis of camera 1
+
+plot3(o_c1(1)+[0, 100*x_c1(1), nan, 0, 100*y_c1(1), nan, 0, 100*z_c1(1)], o_c1(2)+[0, 100*x_c1(2), nan, 0, 100*y_c1(2), nan, 0, 100*z_c1(2)],o_c1(3)+[0, 100*x_c1(3), nan, 0, 100*y_c1(3), nan, 0, 100*z_c1(3)] );
+t_c1 = text(o_c1(1), o_c1(2), o_c1(3), '\leftarrow camera 1','FontSize',10);
+
+% Plot the image plane of camera 1
+
+cp = [0 256 256 0;0 0 256 256];
+% Transform from image coordinate to R coordiante first
+cp_R = bsxfun(@minus,[uo1;vo1],cp);
+
+% Transform from image coordinate to camera coordinate
+ku1 = -au1/f;
+kv1 = -av1/f;
+cp_c = bsxfun(@rdivide,cp_R,[ku1;kv1]);
+
+plane_x = [cp_c(1,:),cp_c(1,1)];
+plane_y = [cp_c(2,:),cp_c(2,1)];
+plane_z = [f,f,f,f,f];
+plot3(plane_x,plane_y,plane_z);
+
+% plot the project point in the image plane of camera 1
+ps_2D1 = v1(1:2,1);
+
+ps_2D1_R = bsxfun(@minus,[uo1;vo1],ps_2D1);
+ps_2D1_c = bsxfun(@rdivide,ps_2D1_R, [ku1;kv1]);
+
+ps_2D1_camera = [ps_2D1_c;f];
+scatter3(ps_2D1_camera(1),ps_2D1_camera(2),ps_2D1_camera(3),'r+');
+
+plot3([0,ps_3D(1)],[0,ps_3D(2)],[0,ps_3D(3)]);
+
+o_c2 = [tx;ty;tz;1];% origin of camera 2
+x_c2 = R2*[1;0;0];% x axis of camera 2
+y_c2 = R2*[0;1;0];% y axis of camera 2
+z_c2 = R2*[0;0;1];% z axis of camera 2
+
+plot3(o_c2(1)+[0, 100*x_c2(1), nan, 0, 100*y_c2(1), nan, 0, 100*z_c2(1)], o_c2(2)+[0, 100*x_c2(2), nan, 0, 100*y_c2(2), nan, 0, 100*z_c2(2)],o_c2(3)+[0, 100*x_c2(3), nan, 0, 100*y_c2(3), nan, 0, 100*z_c2(3)] );
+t_c2 = text(o_c2(1), o_c2(2), o_c2(3), '\leftarrow camera 2','FontSize',10);
+
+
+
+% plot the project point in the image plane of camera 2
+ps_2D2 = v2(1:2,1);
+ps_2D2_camera = [ps_2D2_c;f];
+
