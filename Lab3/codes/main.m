@@ -3,7 +3,7 @@ close all
 clear
 clc
 
-f=80; % focal length. Unit: mm
+f=80; % focal length for both camera. Unit: mm
 %% Step1 Define camera 1
 au1 = 100; av1 = 120; uo1 = 128; vo1 = 128;
 height1 = 256;
@@ -70,7 +70,7 @@ V(:,20) = [900;400;3000;1];
 IN1 = [A1,[0;0;0]];% 3*4 intrinsic matrix for camera1
 IN2 = [A2,[0;0;0]];% 3*4 intrinsic matrix for camera2
 EX1 = [R1,T1;0,0,0,1];% 4*4 extrinsic matrix for camera1
-EX2 = inv([R2,T2;0,0,0,1]); % 4*4 extrinsic matrix for camera2
+EX2 = inv([R2,T2;0,0,0,1]); % 4*4 extrinsic matrix for camera2 (Transfer from world coordinate to image2 coordinate)
 
 % Compute the 2D points in both image planes
 v1 = zeros(3,pn);
@@ -95,7 +95,7 @@ F == F_ground
 % Step 7 is moved here
 % 
 
-% [m,d] = epi_plot(v2,v1,F,[0,height2],[0,400]);
+[m,d] = epi_plot(v2,v1,F,[0,height2],[0,400]);
 
 % Draw the epipole (way1, the last column of U and V in SVD(F))
 [u,s,v] = svd(F);
@@ -105,14 +105,15 @@ pl = [v(1,3)/v(3,3),v(2,3)/v(3,3)];
 % image plane of the other)
 % Be careful, we should add intrinsic matrix to change to the pixel instead
 % of metric
-T1 = IN1 * EX1; % world point to frame 1
-T2 = IN2 * EX2; % world point to frame 2
+Tr1 = IN1 * EX1; % world point to frame 1
+Tr2 = IN2 * EX2; % world point to frame 2
 
-pr_tmp = T2 * [0;0;0;1];
-pl_tmp = T1 * [tx;ty;tz;1];
+pr_tmp = Tr2 * [0;0;0;1];
+pl_tmp = Tr1 * [tx;ty;tz;1];
 pr = [pr_tmp(1)/pr_tmp(3),pr_tmp(2)/pr_tmp(3)];
 pl = [pl_tmp(1)/pl_tmp(3),pl_tmp(2)/pl_tmp(3)];
 
+plot(pr(1),pr(2),'b*');
 % epi_plot(v1,v2,F',[0,height1],[-340, width1]);
 
 % % Draw the epipole
@@ -173,41 +174,64 @@ t_c1 = text(o_c1(1), o_c1(2), o_c1(3), '\leftarrow camera 1','FontSize',10);
 % Plot the image plane of camera 1
 
 cp = [0 256 256 0;0 0 256 256];
-% Transform from image coordinate to R coordiante first
-cp_R = bsxfun(@minus,[uo1;vo1],cp);
 
-% Transform from image coordinate to camera coordinate
-ku1 = -au1/f;
-kv1 = -av1/f;
-cp_c = bsxfun(@rdivide,cp_R,[ku1;kv1]);
+cp1_w = im2world(cp,R1,T1,f,uo1,vo1,au1,av1);
 
-plane_x = [cp_c(1,:),cp_c(1,1)];
-plane_y = [cp_c(2,:),cp_c(2,1)];
-plane_z = [f,f,f,f,f];
+plane_x = [cp1_w(1,:),cp1_w(1,1)];
+plane_y = [cp1_w(2,:),cp1_w(2,1)];
+plane_z = [cp1_w(3,:),cp1_w(3,1)];
 plot3(plane_x,plane_y,plane_z);
 
 % plot the project point in the image plane of camera 1
 ps_2D1 = v1(1:2,1);
 
-ps_2D1_R = bsxfun(@minus,[uo1;vo1],ps_2D1);
-ps_2D1_c = bsxfun(@rdivide,ps_2D1_R, [ku1;kv1]);
+ps_2D1_w = im2world(ps_2D1,R1,T1,f,uo1,vo1,au1,av1);
 
-ps_2D1_camera = [ps_2D1_c;f];
-scatter3(ps_2D1_camera(1),ps_2D1_camera(2),ps_2D1_camera(3),'r+');
+scatter3(ps_2D1_w(1),ps_2D1_w(2),ps_2D1_w(3),'r+');
 
 plot3([0,ps_3D(1)],[0,ps_3D(2)],[0,ps_3D(3)]);
 
+
+% Plot camera 2 system
+
+
 o_c2 = [tx;ty;tz;1];% origin of camera 2
-x_c2 = R2*[1;0;0];% x axis of camera 2
-y_c2 = R2*[0;1;0];% y axis of camera 2
+x_c2 = R2*[1;0;0];% x axis of camera 2 (transform to world coordinate)
+y_c2 = R2*[0;1;0];% y axis of camera 2 
 z_c2 = R2*[0;0;1];% z axis of camera 2
 
 plot3(o_c2(1)+[0, 100*x_c2(1), nan, 0, 100*y_c2(1), nan, 0, 100*z_c2(1)], o_c2(2)+[0, 100*x_c2(2), nan, 0, 100*y_c2(2), nan, 0, 100*z_c2(2)],o_c2(3)+[0, 100*x_c2(3), nan, 0, 100*y_c2(3), nan, 0, 100*z_c2(3)] );
 t_c2 = text(o_c2(1), o_c2(2), o_c2(3), '\leftarrow camera 2','FontSize',10);
 
 
+% Plot the image plane of camera 2
+
+cp = [0 256 256 0;0 0 256 256];% Corner point of the image plane
+
+cp_w = im2world(cp,R2,T2,f,uo2,vo2,au2,av2);
+
+plane2_x = [cp_w(1,:),cp_w(1,1)];
+plane2_y = [cp_w(2,:),cp_w(2,1)];
+plane2_z = [cp_w(3,:),cp_w(3,1)];
+
+plot3(plane2_x,plane2_y,plane2_z);
+
+
 
 % plot the project point in the image plane of camera 2
 ps_2D2 = v2(1:2,1);
-ps_2D2_camera = [ps_2D2_c;f];
 
+ps_2D2_w = im2world(ps_2D2,R2,T2,f,uo2,vo2,au2,av2);
+scatter3(ps_2D2_w(1),ps_2D2_w(2),ps_2D2_w(3),'r+');
+
+plot3([o_c2(1),ps_3D(1)],[o_c2(2),ps_3D(2)],[o_c2(3),ps_3D(3)]);
+
+% plot epipoles for both camera
+pl_w = im2world(pl',R1,T1,f,uo1,vo1,au1,av1);
+pr_w = im2world(pr',R2,T2,f,uo2,vo2,au2,av2);
+
+plot3(pl_w(1),pl_w(2),pl_w(3),'b*');
+plot3(pr_w(1),pr_w(2),pr_w(3),'b*');
+
+% Plot the pi plane
+plot3([o_c1(1),o_c2(1),ps_3D(1),o_c1(1)],[o_c1(2),o_c2(2),ps_3D(2),o_c1(2)],[o_c1(3),o_c2(3),ps_3D(3),o_c1(3)],'-');
