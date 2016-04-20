@@ -21,5 +21,5 @@ for i = 1 : pn
     plot([lim_w(1), lim_w(2)], [m(i) * lim_w(1) + d(i), m(i) * lim_w(2) + d(i)],'-');
 end
 
-% hold off;
+hold off;
 end

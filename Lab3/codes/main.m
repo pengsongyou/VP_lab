@@ -95,7 +95,8 @@ F == F_ground
 % Step 7 is moved here
 % 
 
-[m,d] = epi_plot(v2,v1,F,[0,height2],[0,400]);
+% [m,d] = epi_plot(v2,v1,F,[0,height2],[0,400]);
+%
 
 % Draw the epipole (way1, the last column of U and V in SVD(F))
 [u,s,v] = svd(F);
@@ -113,7 +114,7 @@ pl_tmp = Tr1 * [tx;ty;tz;1];
 pr = [pr_tmp(1)/pr_tmp(3),pr_tmp(2)/pr_tmp(3)];
 pl = [pl_tmp(1)/pl_tmp(3),pl_tmp(2)/pl_tmp(3)];
 
-plot(pr(1),pr(2),'b*');
+% plot(pr(1),pr(2),'b*');
 % epi_plot(v1,v2,F',[0,height1],[-340, width1]);
 
 % % Draw the epipole
@@ -126,19 +127,20 @@ plot(pr(1),pr(2),'b*');
 %% Step11 Add Gaussian Noise to 2D points
 std_noise = 0.05;% Satisfy the condition that 95% of noise points are within the range of [-1,1]
 
-vn1 = v1;
-vn1 = vn1 + std_noise * randn(3,pn); % Get noisy 2D points
+vn1 = v1(:,1:8);
+vn1(1:2,:) = vn1(1:2,:) + std_noise * randn(2,size(vn1,2)); % Get noisy 2D points
 
-vn2 = v2;
-vn2 = vn2 + std_noise * randn(3,pn); % Get noisy 2D points
-
+vn2 = v2(:,1:8);
+vn2(1:2,:) = vn2(1:2,:) + std_noise * randn(2,size(vn2,2)); % Get noisy 2D points
+% [m,d] = epi_plot(vn2,vn1,F,[0,height2],[0,400]);
 
 %% Repeat Step8 up to 10 with the noisy 2D points
 
 % Step8 : Compute fundamental matrix
 F_n = compute_F(vn1,vn2);
 
-% epi_plot(vn2,vn1,F_n,[0,height2],[0,400]);
+[m,d] = epi_plot(vn2,vn1,F_n,[0,height2],[0,400]);
+mean_dis = computeMeanDis(vn2,m,d)
 
 % epi_plot(vn1,vn2,F_n',[0,height1],[-340, width1]);
 
@@ -156,10 +158,11 @@ F_n_svd = compute_F_svd(vn1,vn2);
 %% Plot system
 
 figure;
-
-ps_3D = [V(1,1),V(2,1),V(3,1)];
+ps_idx = 1;
+ps_3D = V(1:3,ps_idx);
+% ps_3D = V(1:3,1:2);
 % plot a 3D point
-scatter3(ps_3D(1),ps_3D(2),ps_3D(3)); hold on; title('Epipolar system');
+scatter3(ps_3D(1,:),ps_3D(2,:),ps_3D(3,:)); hold on; title('Epipolar system');
 xlabel('x'); ylabel('y'); zlabel('z')
 
 % plot the focal points of both camera
@@ -183,13 +186,13 @@ plane_z = [cp1_w(3,:),cp1_w(3,1)];
 plot3(plane_x,plane_y,plane_z);
 
 % plot the project point in the image plane of camera 1
-ps_2D1 = v1(1:2,1);
+ps_2D1 = v1(1:2,ps_idx);
 
 ps_2D1_w = im2world(ps_2D1,R1,T1,f,uo1,vo1,au1,av1);
 
-scatter3(ps_2D1_w(1),ps_2D1_w(2),ps_2D1_w(3),'r+');
+scatter3(ps_2D1_w(1,:),ps_2D1_w(2,:),ps_2D1_w(3,:),'r+');
 
-plot3([0,ps_3D(1)],[0,ps_3D(2)],[0,ps_3D(3)]);
+% plot3([0,ps_3D(1,:)],[0,ps_3D(2,:)],[0,ps_3D(3,:)]);
 
 
 % Plot camera 2 system
@@ -219,12 +222,10 @@ plot3(plane2_x,plane2_y,plane2_z);
 
 
 % plot the project point in the image plane of camera 2
-ps_2D2 = v2(1:2,1);
+ps_2D2 = v2(1:2,ps_idx);
 
 ps_2D2_w = im2world(ps_2D2,R2,T2,f,uo2,vo2,au2,av2);
-scatter3(ps_2D2_w(1),ps_2D2_w(2),ps_2D2_w(3),'r+');
-
-plot3([o_c2(1),ps_3D(1)],[o_c2(2),ps_3D(2)],[o_c2(3),ps_3D(3)]);
+scatter3(ps_2D2_w(1,:),ps_2D2_w(2,:),ps_2D2_w(3,:),'r+');
 
 % plot epipoles for both camera
 pl_w = im2world(pl',R1,T1,f,uo1,vo1,au1,av1);
@@ -233,5 +234,16 @@ pr_w = im2world(pr',R2,T2,f,uo2,vo2,au2,av2);
 plot3(pl_w(1),pl_w(2),pl_w(3),'b*');
 plot3(pr_w(1),pr_w(2),pr_w(3),'b*');
 
+
 % Plot the pi plane
-plot3([o_c1(1),o_c2(1),ps_3D(1),o_c1(1)],[o_c1(2),o_c2(2),ps_3D(2),o_c1(2)],[o_c1(3),o_c2(3),ps_3D(3),o_c1(3)],'-');
+for i = 1 : length(ps_idx)
+    plot3([o_c1(1),o_c2(1),ps_3D(1,i),o_c1(1)],[o_c1(2),o_c2(2),ps_3D(2,i),o_c1(2)],[o_c1(3),o_c2(3),ps_3D(3,i),o_c1(3)],'-');
+end
+
+% % Plot epipolar lines
+% for i = 1 : length(ps_idx)
+%     el1 = im2world([0;d(i)],R2,T2,f,uo2,vo2,au2,av2);
+%     el2 = im2world([400;400*m(i) + d(i)],R2,T2,f,uo2,vo2,au2,av2);
+%     plot3([el1(1),el2(1)],[el1(2),el2(2)],[el1(3),el2(3)],'g-','LineWidth',1);
+% end
+
