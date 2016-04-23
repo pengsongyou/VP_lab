@@ -41,8 +41,7 @@ T_cross = [0, -T2(3), T2(2);
 F_ground = inv(A2') * R2' * T_cross * inv(A1);
 F_ground = F_ground./ F_ground(9);
 %% Step5 Define Object point
-pn = 20;
-V = zeros(4,pn);
+% V = zeros(4,pn);
 V(:,1) = [100;-400;2000;1];
 V(:,2) = [300;-400;3000;1];
 V(:,3) = [500;-400;4000;1];
@@ -63,7 +62,12 @@ V(:,17) = [300;400;3000;1];
 V(:,18) = [500;400;4000;1];
 V(:,19) = [700;400;2000;1];
 V(:,20) = [900;400;3000;1];
-
+more_range = 21:200;
+V(1,more_range) = randi(1000,1,length(more_range));
+V(2,more_range) = round(800 * rand(1,length(more_range)) - 400);
+V(3,more_range) = randi(4000,1,length(more_range));
+V(4,more_range) = ones(1,length(more_range));
+pn = size(V,2);
 %% Step 6 Compute the image points in both image planes
 
 % Define intrinsic and extrinsic matrix first
@@ -83,29 +87,30 @@ for i = 1 : pn
 end
 
 %% Step 7 Draw the 2D points in two camera windows
-
+% Move the step 10
 %% Step8 Compute Fundamental matrix using 8-pionts least mean square method
 F = compute_F(v1,v2);
 
 %% Step9 Compare the F acquired from Step8 with the Ground truth
-F == F_ground
+mean_dif = mean(mean((F - F_ground)));
 
 %% Step10 Draw epipoles and epipolar lines
 
 % Step 7 is moved here
-% 
 
-% [m,d] = epi_plot(v2,v1,F,[0,height2],[0,400]);
-%
-
+% Plot image plane 2
+epi_plot(v2(:,1:20),v1(:,1:20),F,[0,height2],[0,400]);
+title('Epipoles and Epipolar lines in image plane 2');
 % Draw the epipole (way1, the last column of U and V in SVD(F))
-[u,s,v] = svd(F);
-pr = [u(1,3)/u(3,3),u(2,3)/u(3,3)];
-pl = [v(1,3)/v(3,3),v(2,3)/v(3,3)];
+% [u,s,v] = svd(F);
+% pr = [u(1,3)/u(3,3),u(2,3)/u(3,3)];
+% pl = [v(1,3)/v(3,3),v(2,3)/v(3,3)];
+
 % Draw the epipole (way2, projecting the focal point of each camera to the
 % image plane of the other)
 % Be careful, we should add intrinsic matrix to change to the pixel instead
 % of metric
+
 Tr1 = IN1 * EX1; % world point to frame 1
 Tr2 = IN2 * EX2; % world point to frame 2
 
@@ -114,34 +119,47 @@ pl_tmp = Tr1 * [tx;ty;tz;1];
 pr = [pr_tmp(1)/pr_tmp(3),pr_tmp(2)/pr_tmp(3)];
 pl = [pl_tmp(1)/pl_tmp(3),pl_tmp(2)/pl_tmp(3)];
 
-% plot(pr(1),pr(2),'b*');
-% epi_plot(v1,v2,F',[0,height1],[-340, width1]);
+plot(pr(1),pr(2),'b*','MarkerSize',10);
 
-% % Draw the epipole
-% pole1 = [(d(2) - d(1))/(m(1) - m(2)),m(1) * (d(2) - d(1))/(m(1) - m(2)) + d(1)];
-% plot(pole1(1),pole1(2),'*','MarkerSize',10);
-% text(pole1(1)-20,pole1(2)-10, ' epipole','FontSize',10);
-% 
-% hold off;
+% Plot image plane 1
+epi_plot(v1(:,1:20),v2(:,1:20),F',[0,height1],[-340, width1]);
+plot(pl(1),pl(2),'b*','MarkerSize',10);
+title('Epipoles and Epipolar lines in image plane 1');
 
 %% Step11 Add Gaussian Noise to 2D points
-std_noise = 0.05;% Satisfy the condition that 95% of noise points are within the range of [-1,1]
+std_noise = 0.05;
 
-vn1 = v1(:,1:8);
+vn1 = v1;
 vn1(1:2,:) = vn1(1:2,:) + std_noise * randn(2,size(vn1,2)); % Get noisy 2D points
 
-vn2 = v2(:,1:8);
+vn2 = v2;
 vn2(1:2,:) = vn2(1:2,:) + std_noise * randn(2,size(vn2,2)); % Get noisy 2D points
 % [m,d] = epi_plot(vn2,vn1,F,[0,height2],[0,400]);
 
 %% Repeat Step8 up to 10 with the noisy 2D points
+noise_range = 20;
+
+Tr1 = IN1 * EX1; % Transform from world frame to image 1
+Tr2 = IN2 * EX2; % Transform from world frame to image 2
+
+pr_tmp = Tr2 * [0;0;0;1];
+pl_tmp = Tr1 * [tx;ty;tz;1];
+pr = [pr_tmp(1)/pr_tmp(3),pr_tmp(2)/pr_tmp(3)];
+pl = [pl_tmp(1)/pl_tmp(3),pl_tmp(2)/pl_tmp(3)];
 
 % Step8 : Compute fundamental matrix
-F_n = compute_F(vn1,vn2);
+F_n = compute_F(vn1(:,1 : noise_range),vn2(:,1 : noise_range));
 
-[m,d] = epi_plot(vn2,vn1,F_n,[0,height2],[0,400]);
-mean_dis = computeMeanDis(vn2,m,d)
+[m,d] = epi_plot(vn2(:,1 : noise_range),vn1(:,1 : noise_range),F_n,[0,height2],[0,400]);
+plot(pr(1),pr(2),'b*','MarkerSize',10);
+title('Epipoles and Epipolar lines in image plane 2 with noise');
+mean_dis_image_2 = computeMeanDis(vn2(:,1 : noise_range),m,d)
 
+
+[m,d] = epi_plot(vn1(:,1 : noise_range),vn2(:,1 : noise_range),F_n',[0,height1],[-340, width1]);
+plot(pl(1),pl(2),'b*','MarkerSize',10);
+title('Epipoles and Epipolar lines in image plane 1 with noise');
+mean_dis_image_1 = computeMeanDis(vn1(:,1 : noise_range),m,d)
 % epi_plot(vn1,vn2,F_n',[0,height1],[-340, width1]);
 
 %% Part2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -149,23 +167,20 @@ mean_dis = computeMeanDis(vn2,m,d)
 %% Step14 Fundamental Matrix by SVD, Compare
 F_svd = compute_F_svd(v1,v2);
 
-% epi_plot(v2,v1,F_svd,[0,height2],[0,400]); 
 
-F_n_svd = compute_F_svd(vn1,vn2);
-
-% epi_plot(vn2,vn1,F_n_svd,[0,height2],[0,400]); 
+F_n_svd = compute_F_svd(vn1(:,1 : noise_range),vn2(:,1 : noise_range));
 
 %% Plot system
 
 figure;
-ps_idx = 1;
+ps_idx = 1:4;
 ps_3D = V(1:3,ps_idx);
-% ps_3D = V(1:3,1:2);
+
 % plot a 3D point
 scatter3(ps_3D(1,:),ps_3D(2,:),ps_3D(3,:)); hold on; title('Epipolar system');
 xlabel('x'); ylabel('y'); zlabel('z')
 
-% plot the focal points of both camera
+% plot the axis of camera 1
 o_c1 = [0;0;0;1];% origin of camera 1
 x_c1 = [1;0;0;0];% x axis of camera 1
 y_c1 = [0;1;0;0];% y axis of camera 1
@@ -176,8 +191,7 @@ t_c1 = text(o_c1(1), o_c1(2), o_c1(3), '\leftarrow camera 1','FontSize',10);
 
 % Plot the image plane of camera 1
 
-cp = [0 256 256 0;0 0 256 256];
-
+cp = [0 256 256 0;0 0 256 256]; % 4 corner points of the image plane
 cp1_w = im2world(cp,R1,T1,f,uo1,vo1,au1,av1);
 
 plane_x = [cp1_w(1,:),cp1_w(1,1)];
@@ -187,16 +201,10 @@ plot3(plane_x,plane_y,plane_z);
 
 % plot the project point in the image plane of camera 1
 ps_2D1 = v1(1:2,ps_idx);
-
 ps_2D1_w = im2world(ps_2D1,R1,T1,f,uo1,vo1,au1,av1);
-
 scatter3(ps_2D1_w(1,:),ps_2D1_w(2,:),ps_2D1_w(3,:),'r+');
 
-% plot3([0,ps_3D(1,:)],[0,ps_3D(2,:)],[0,ps_3D(3,:)]);
-
-
 % Plot camera 2 system
-
 
 o_c2 = [tx;ty;tz;1];% origin of camera 2
 x_c2 = R2*[1;0;0];% x axis of camera 2 (transform to world coordinate)
@@ -209,21 +217,16 @@ t_c2 = text(o_c2(1), o_c2(2), o_c2(3), '\leftarrow camera 2','FontSize',10);
 
 % Plot the image plane of camera 2
 
-cp = [0 256 256 0;0 0 256 256];% Corner point of the image plane
-
+cp = [0 256 256 0;0 0 256 256];% 4 corner points of the image plane
 cp_w = im2world(cp,R2,T2,f,uo2,vo2,au2,av2);
 
 plane2_x = [cp_w(1,:),cp_w(1,1)];
 plane2_y = [cp_w(2,:),cp_w(2,1)];
 plane2_z = [cp_w(3,:),cp_w(3,1)];
-
 plot3(plane2_x,plane2_y,plane2_z);
-
-
 
 % plot the project point in the image plane of camera 2
 ps_2D2 = v2(1:2,ps_idx);
-
 ps_2D2_w = im2world(ps_2D2,R2,T2,f,uo2,vo2,au2,av2);
 scatter3(ps_2D2_w(1,:),ps_2D2_w(2,:),ps_2D2_w(3,:),'r+');
 
@@ -239,11 +242,3 @@ plot3(pr_w(1),pr_w(2),pr_w(3),'b*');
 for i = 1 : length(ps_idx)
     plot3([o_c1(1),o_c2(1),ps_3D(1,i),o_c1(1)],[o_c1(2),o_c2(2),ps_3D(2,i),o_c1(2)],[o_c1(3),o_c2(3),ps_3D(3,i),o_c1(3)],'-');
 end
-
-% % Plot epipolar lines
-% for i = 1 : length(ps_idx)
-%     el1 = im2world([0;d(i)],R2,T2,f,uo2,vo2,au2,av2);
-%     el2 = im2world([400;400*m(i) + d(i)],R2,T2,f,uo2,vo2,au2,av2);
-%     plot3([el1(1),el2(1)],[el1(2),el2(2)],[el1(3),el2(3)],'g-','LineWidth',1);
-% end
-

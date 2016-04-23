@@ -1,6 +1,6 @@
 function [m,d] = epi_plot(v1,v2,F,lim_h,lim_w)
 % Plot points in image plane
-figure; hold on; %title('2D points in image plane2');
+figure; hold on; 
 pn = size(v1,2);
 for i = 1 : pn 
     plot(v1(1,i),v1(2,i),'r+', 'MarkerSize',10);    
@@ -21,5 +21,5 @@ for i = 1 : pn
     plot([lim_w(1), lim_w(2)], [m(i) * lim_w(1) + d(i), m(i) * lim_w(2) + d(i)],'-');
 end
 
-hold off;
+% hold off;
 end
